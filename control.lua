@@ -505,7 +505,7 @@ local function onInit()
 
 			on_chunk_generated(event)
 
-			for _,force in pairs(game.forces) do
+			for _, force in pairs(game.forces) do
 				if force.is_chunk_charted(surface,{x,y}) then
 					local chunkPosition = {x=x,y=y}
 					_on_chunk_charted(surface,force,chunkPosition,chunk.area)
@@ -558,26 +558,78 @@ local function clear_map_tags_and_data(event)
 	end
 end
 
-
+force_chunks_to_tag = {}
+resource_chunks_to_tag = {}
 
 local function reset_map_tags_and_data(event)
 	local player = game.players[event.player_index]
 	clear_map_tags_and_data(nil)
 
+	
 	for _, force in pairs(game.forces) do
+		table.insert(force_chunks_to_tag, force)
 		for _, surface in pairs(game.surfaces) do
 			for chunk in surface.get_chunks() do
-				local chunkPosition = {x=chunk.x,y=chunk.y}
-				if force.is_chunk_charted(surface,chunkPosition) then
-					_on_chunk_charted(surface,force,chunkPosition,chunk.area)
-				end
+				table.insert(resource_chunks_to_tag, chunk) --add resource chunks to gradually process
+				--TODO: add force, surface elements to the relative chunk in global arr
 			end
 		end
 	end
 
-	player.print("Removed and re-tagged all map labels.")
+	player.print("Removed and retagging all map labels.")
 end
 
+script.on_nth_tick(7200,
+  function(event) --gradually_map_tags_and_data()
+	if next(force_chunks_to_tag) ~= nil then
+		local num_force_chunks = #force_chunks_to_tag
+		for i=1,1,-1 do
+			local force = table.remove(force_chunks_to_tag) --pop element off table to process one
+			for _, surface in pairs(game.surfaces) do
+				for chunk in surface.get_chunks() do
+					local chunkPosition = {x=chunk.x,y=chunk.y}
+						if force.is_chunk_charted(surface,chunkPosition) then
+						_on_chunk_charted(surface,force,chunkPosition,chunk.area)
+					end
+				end
+			end
+		end
+		
+		if event then
+			local player = game.get_player(1)
+			if next(force_chunks_to_tag) ~= nil then
+				player.print("Grishord resources: " .. num_force_chunks - 1 .. " resource chunks left to tag")
+			else
+				player.print("Grishord resources: all done with tagging resource map labels")
+			end
+		end
+	end
+  end)
+
+-- script.on_nth_tick(30,
+--   function(event) --gradually_map_tags_and_data()
+-- 	if next(resource_chunks_to_tag) ~= nil then
+-- 		for i=5,1,-1 do
+-- 			local chunk = table.remove(resource_chunks_to_tag) --pop element off table to process one
+-- 			local chunkPosition = {x=chunk.x,y=chunk.y}
+-- 			if force.is_chunk_charted(surface,chunkPosition) then
+-- 				_on_chunk_charted(surface,force,chunkPosition,chunk.area)
+-- 			end
+-- 		end
+		
+-- 		if event then
+-- 			local player = game.get_player(1)
+-- 			player.print("Grishord resources: " .. #resource_chunks_to_tag .. " left")
+-- 			--player.print("Grishord resources: processing..")
+-- 		end
+	
+-- 	else
+-- 		if event then
+-- 			local player = game.get_player(1)
+-- 			player.print("Grishord resources: all done")
+-- 		end
+-- 	end
+--   end)
 
 
 local function unifiedCommandHandler(event)
